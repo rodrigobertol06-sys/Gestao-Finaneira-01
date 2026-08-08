@@ -70,10 +70,22 @@ export async function montarDashboard(container, usuario) {
         </div>
       </div>
 
-      <!-- 004.2 - Saldo projetado: só considera o mês selecionado + o que já está atrasado -->
+      <!-- 004.2 - Saldo projetado: só considera o mês selecionado (contas atrasadas ficam de fora por padrão) -->
       <div class="card p-4">
-        <p class="text-xs text-muted">Saldo projetado (entradas do mês − saídas do mês − contas do mês/atrasadas)</p>
+        <p class="text-xs text-muted">Saldo projetado (entradas do mês − saídas do mês − contas do mês)</p>
         <p id="dash-saldo-projetado" class="text-xl font-semibold text-primary dark:text-white mt-1">${formatarMoeda(0)}</p>
+
+        <button id="botao-simular-atrasadas" class="mt-3 text-sm text-primary dark:text-white underline disabled:opacity-50 disabled:no-underline" disabled>
+          Simular contas em atraso (0)
+        </button>
+
+        <div id="painel-simulacao" class="hidden mt-3 pt-3 border-t border-gray-200 dark:border-white/10 space-y-2">
+          <p class="text-xs text-muted">Marque quais contas atrasadas quer incluir na simulação:</p>
+          <div id="lista-atrasadas-simulacao" class="space-y-1.5"></div>
+          <p class="text-sm font-semibold text-primary dark:text-white pt-2 border-t border-gray-200 dark:border-white/10">
+            Saldo simulado: <span id="dash-saldo-simulado"></span>
+          </p>
+        </div>
       </div>
 
       <!-- 004.3 - Contas futuras: vencimento além do mês selecionado, ainda não relevantes para o saldo do mês -->
@@ -163,6 +175,15 @@ function escutarDashboard(usuario, ehGestor) {
   const botaoMesAnterior = document.getElementById("botao-mes-anterior");
   const botaoMesSeguinte = document.getElementById("botao-mes-seguinte");
 
+  // 005.4 - Simulador de contas atrasadas: quais estão marcadas (mantém a marcação entre atualizações)
+  const botaoSimular = document.getElementById("botao-simular-atrasadas");
+  const painelSimulacao = document.getElementById("painel-simulacao");
+  const listaSimulacao = document.getElementById("lista-atrasadas-simulacao");
+  const saldoSimuladoTexto = document.getElementById("dash-saldo-simulado");
+  const selecionadasAtrasadas = new Set();
+
+  botaoSimular.addEventListener("click", () => painelSimulacao.classList.toggle("hidden"));
+
   let mesSelecionado = new Date().toISOString().slice(0, 7); // "AAAA-MM"
   let entradas = [];
   let saidas = [];
@@ -234,9 +255,12 @@ function escutarDashboard(usuario, ehGestor) {
     document.getElementById("dash-contas-mes").textContent = formatarMoeda(totalContasDoMes);
     document.getElementById("dash-contas-atrasadas").textContent = formatarMoeda(totalContasAtrasadas);
     document.getElementById("dash-contas-futuras").textContent = formatarMoeda(totalContasFuturas);
-    document.getElementById("dash-saldo-projetado").textContent = formatarMoeda(
-      totalEntradas - totalSaidas - totalContasDoMes - totalContasAtrasadas
-    );
+
+    // 005.3.1 - Saldo projetado NÃO inclui contas atrasadas por padrão; o simulador abaixo permite
+    // marcar quais atrasadas entrariam na conta, sem alterar esse valor "oficial"
+    const saldoProjetadoBase = totalEntradas - totalSaidas - totalContasDoMes;
+    document.getElementById("dash-saldo-projetado").textContent = formatarMoeda(saldoProjetadoBase);
+    renderizarSimulacaoAtrasadas(contasAtrasadas, saldoProjetadoBase);
 
     // 005.3 - Médias mensais do ano ao qual pertence o mês selecionado
     const anoSelecionado = mesSelecionado.slice(0, 4);
@@ -272,9 +296,54 @@ function escutarDashboard(usuario, ehGestor) {
   });
 
   const pararContas = onSnapshot(consultaContas, (snapshot) => {
-    contas = snapshot.docs.map((d) => d.data());
+    contas = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
     atualizarPainel();
   });
+
+  // 005.5 - Renderiza a lista de contas atrasadas com checkbox e recalcula o saldo simulado
+  // conforme a marcação. A seleção (Set) é preservada entre atualizações de dados/mês.
+  function renderizarSimulacaoAtrasadas(contasAtrasadas, saldoBase) {
+    // 005.5.1 - Remove da seleção qualquer conta que não esteja mais atrasada (foi paga, editada, etc.)
+    const idsAtuais = new Set(contasAtrasadas.map((c) => c.id));
+    [...selecionadasAtrasadas].forEach((id) => {
+      if (!idsAtuais.has(id)) selecionadasAtrasadas.delete(id);
+    });
+
+    botaoSimular.textContent = `Simular contas em atraso (${contasAtrasadas.length})`;
+    botaoSimular.disabled = contasAtrasadas.length === 0;
+    if (contasAtrasadas.length === 0) painelSimulacao.classList.add("hidden");
+
+    function recalcularSaldoSimulado() {
+      const somaSelecionadas = contasAtrasadas
+        .filter((c) => selecionadasAtrasadas.has(c.id))
+        .reduce((soma, c) => soma + c.restante, 0);
+      saldoSimuladoTexto.textContent = formatarMoeda(saldoBase - somaSelecionadas);
+    }
+
+    listaSimulacao.innerHTML = contasAtrasadas
+      .map(
+        (c) => `
+          <label class="flex items-center justify-between gap-2 text-sm cursor-pointer">
+            <span class="flex items-center gap-2">
+              <input type="checkbox" data-id="${c.id}" class="h-4 w-4" ${selecionadasAtrasadas.has(c.id) ? "checked" : ""} />
+              ${c.nome}
+            </span>
+            <span class="text-status-atrasado">${formatarMoeda(c.restante)}</span>
+          </label>
+        `
+      )
+      .join("");
+
+    listaSimulacao.querySelectorAll("input[type='checkbox']").forEach((input) => {
+      input.addEventListener("change", () => {
+        if (input.checked) selecionadasAtrasadas.add(input.dataset.id);
+        else selecionadasAtrasadas.delete(input.dataset.id);
+        recalcularSaldoSimulado();
+      });
+    });
+
+    recalcularSaldoSimulado();
+  }
 
   return () => {
     pararEntradas();
