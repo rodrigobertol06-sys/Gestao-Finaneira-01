@@ -65,7 +65,7 @@ export async function montarDashboard(container, usuario) {
           <p id="dash-contas-atrasadas" class="text-lg font-semibold text-status-atrasado mt-1">${formatarMoeda(0)}</p>
         </a>
         <div class="card p-4">
-          <p class="text-xs text-muted">Saldo do mês</p>
+          <p class="text-xs text-muted">Saldo atual</p>
           <p id="dash-saldo" class="text-lg font-semibold text-primary dark:text-white mt-1">${formatarMoeda(0)}</p>
         </div>
       </div>

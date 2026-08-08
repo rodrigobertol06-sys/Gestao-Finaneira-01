@@ -101,6 +101,23 @@ service cloud.firestore {
         );
       }
 
+      // 005.1 - Compras (histórico itemizado da Lista de Mercado): mesmo padrão de Entradas/Saídas.
+      // Simples só lê/cria as próprias compras; Pro e Master têm acesso a todas da família.
+      match /compras/{docId} {
+        allow read: if souMaster() || (
+          estaLogado() && minhaFamilia() == familiaId &&
+          (meuNivel() != "simples" || resource.data.membroId == request.auth.uid)
+        );
+        allow create, update: if souMaster() || (
+          estaLogado() && minhaFamilia() == familiaId &&
+          (meuNivel() != "simples" || request.resource.data.membroId == request.auth.uid)
+        );
+        allow delete: if souMaster() || (
+          estaLogado() && minhaFamilia() == familiaId &&
+          (meuNivel() != "simples" || resource.data.membroId == request.auth.uid)
+        );
+      }
+
       // 006 - Contas a Pagar: cada uma tem um responsável (responsavelId).
       // Simples só lê/cria/edita/apaga as contas em que é o responsável (e só pode se atribuir
       // a si mesmo); Pro e Master têm acesso total, inclusive atribuir a qualquer membro.
