@@ -47,6 +47,15 @@ function calcularStatusReal(conta) {
   return vencimento < hoje ? "atrasado" : "pendente";
 }
 
+// 003.1 - Verifica só a data (independente de pagamento parcial). Usado no resumo do mês para
+// separar "do mês" de "atrasada" com a mesma regra do Dashboard.
+function vencimentoJaPassou(conta) {
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const [ano, mes, dia] = conta.vencimento.split("-").map(Number);
+  return new Date(ano, mes - 1, dia) < hoje;
+}
+
 // 004 - Soma "meses" a uma data "AAAA-MM-DD" e devolve outra data no mesmo formato.
 // Usado para gerar o vencimento de cada parcela de uma conta parcelada.
 function somarMeses(dataString, meses) {
@@ -84,7 +93,11 @@ export async function montarContas(container, usuario) {
         <div>
           <h1 class="text-lg heading-primary">Contas a Pagar</h1>
           <p class="text-xs text-muted">Compromissos futuros (só desconta do saldo quando você confirma o pagamento).</p>
-          <p id="total-contas" class="text-sm text-muted mt-1">Em aberto: ${formatarMoeda(0)}</p>
+          <div class="mt-1 space-y-0.5">
+            <p id="total-contas-mes" class="text-sm text-muted">Contas do mês: ${formatarMoeda(0)}</p>
+            <p id="total-contas-atrasadas" class="text-sm text-status-atrasado">Atrasadas: ${formatarMoeda(0)}</p>
+            <p id="total-contas-combinado" class="text-sm font-semibold text-primary dark:text-white">Total (mês + atrasadas): ${formatarMoeda(0)}</p>
+          </div>
         </div>
         <button id="botao-nova-conta" class="btn-primary">+ Nova conta</button>
       </div>
@@ -506,7 +519,9 @@ function escutarContas(usuario, ehGestor, abrirParaEdicao, abrirPagamento) {
     usuario.nivel === "simples" ? query(referenciaColecao, where("responsavelId", "==", usuario.uid)) : referenciaColecao;
 
   const lista = document.getElementById("lista-contas");
-  const totalTexto = document.getElementById("total-contas");
+  const totalMesTexto = document.getElementById("total-contas-mes");
+  const totalAtrasadasTexto = document.getElementById("total-contas-atrasadas");
+  const totalCombinadoTexto = document.getElementById("total-contas-combinado");
   const rotuloMes = document.getElementById("rotulo-mes");
   const botaoMesAnterior = document.getElementById("botao-mes-anterior");
   const botaoMesSeguinte = document.getElementById("botao-mes-seguinte");
@@ -530,11 +545,23 @@ function escutarContas(usuario, ehGestor, abrirParaEdicao, abrirPagamento) {
   function renderizar() {
     rotuloMes.textContent = formatarRotuloMes(mesSelecionado);
 
-    const totalEmAberto = ultimasContas.reduce(
-      (soma, conta) => soma + Math.max(Number(conta.valor || 0) - Number(conta.valorPago || 0), 0),
-      0
+    // 018.1 - Resumo do mês: contas que vencem no mês selecionado + as que já estão atrasadas
+    // (mesma lógica do Dashboard), somadas juntas no "Total (mês + atrasadas)"
+    const comRestante = ultimasContas
+      .map((conta) => ({ ...conta, restante: Math.max(Number(conta.valor || 0) - Number(conta.valorPago || 0), 0) }))
+      .filter((conta) => conta.restante > 0);
+
+    const doMes = comRestante.filter(
+      (conta) => (conta.vencimento || "").startsWith(mesSelecionado) && !vencimentoJaPassou(conta)
     );
-    totalTexto.textContent = `Em aberto: ${formatarMoeda(totalEmAberto)}`;
+    const atrasadas = comRestante.filter((conta) => vencimentoJaPassou(conta));
+
+    const totalDoMes = doMes.reduce((soma, conta) => soma + conta.restante, 0);
+    const totalAtrasadas = atrasadas.reduce((soma, conta) => soma + conta.restante, 0);
+
+    totalMesTexto.textContent = `Contas do mês: ${formatarMoeda(totalDoMes)}`;
+    totalAtrasadasTexto.textContent = `Atrasadas: ${formatarMoeda(totalAtrasadas)}`;
+    totalCombinadoTexto.textContent = `Total (mês + atrasadas): ${formatarMoeda(totalDoMes + totalAtrasadas)}`;
 
     if (resumoPorMembro) renderizarResumoPorMembro(ultimasContas, mesSelecionado, resumoPorMembro);
 

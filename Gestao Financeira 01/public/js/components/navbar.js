@@ -35,8 +35,14 @@ export function renderizarNavbar(usuario, aoClicarMenu, aoRecolher, aoSair) {
         </a>
       </div>
 
-      <!-- 004 - Grupo do canto superior direito: tema, usuário e sair -->
+      <!-- 004 - Grupo do canto superior direito: atualizar, tema, usuário e sair -->
       <div class="flex items-center gap-4">
+        <button id="botao-atualizar" class="text-white/80 hover:text-white" aria-label="Atualizar página" title="Atualizar">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 4v5h5M20 20v-5h-5" />
+            <path d="M4.5 9a8 8 0 0113.9-3.5L20 9M19.5 15a8 8 0 01-13.9 3.5L4 15" />
+          </svg>
+        </button>
         <button id="botao-tema" class="text-white/80 hover:text-white" aria-label="Alternar tema">${iconeTema()}</button>
         <span class="hidden sm:inline text-white/80 text-sm">${usuario.nomeExibicao} · ${formatarNivel(usuario.nivel)}</span>
         <button id="botao-sair" class="text-white/80 hover:text-white text-sm">Sair</button>
@@ -44,9 +50,11 @@ export function renderizarNavbar(usuario, aoClicarMenu, aoRecolher, aoSair) {
     </div>
   `;
 
-  // 005 - Liga os eventos de clique: menu mobile, recolher (desktop), tema e sair
+  // 005 - Liga os eventos de clique: menu mobile, recolher (desktop), atualizar, tema e sair.
+  // "Atualizar" recarrega a página inteira mantendo a URL/hash atual (fica na mesma tela).
   document.getElementById("botao-menu").addEventListener("click", aoClicarMenu);
   document.getElementById("botao-recolher").addEventListener("click", aoRecolher);
+  document.getElementById("botao-atualizar").addEventListener("click", () => window.location.reload());
   document.getElementById("botao-sair").addEventListener("click", aoSair);
 
   const botaoTema = document.getElementById("botao-tema");
