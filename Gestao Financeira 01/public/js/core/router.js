@@ -3,6 +3,7 @@ import { montarDashboard } from "../modules/dashboard/dashboard.js";
 import { montarEntradas } from "../modules/entradas/entradas.js";
 import { montarSaidas } from "../modules/saidas/saidas.js";
 import { montarContas } from "../modules/contas/contas.js";
+import { montarCarteiras } from "../modules/carteiras/carteiras.js";
 import { montarMercado } from "../modules/mercado/mercado.js";
 import { montarMembros } from "../modules/membros/membros.js";
 import { montarAdmin } from "../modules/admin/admin.js";
@@ -15,6 +16,7 @@ const rotas = {
   entradas: montarEntradas,
   saidas: montarSaidas,
   contas: montarContas,
+  carteiras: montarCarteiras,
   mercado: montarMercado,
   membros: montarMembros,
   admin: montarAdmin,

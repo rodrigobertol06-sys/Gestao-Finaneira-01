@@ -181,11 +181,19 @@ export async function montarContas(container, usuario) {
             <select id="input-membro-pagamento" class="form-input"></select>
           </div>
         </div>
-        <div>
-          <label class="form-label">Valor pago (R$)</label>
-          <input id="input-valor-pago" type="text" inputmode="decimal" required class="form-input" />
-          <p id="aviso-valor-pago" class="text-xs text-muted mt-1"></p>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="form-label">Valor pago (R$)</label>
+            <input id="input-valor-pago" type="text" inputmode="decimal" required class="form-input" />
+          </div>
+          <div>
+            <label class="form-label">De onde saiu</label>
+            <select id="input-local-pagamento" class="form-input">
+              <option value="">Carregando...</option>
+            </select>
+          </div>
         </div>
+        <p id="aviso-valor-pago" class="text-xs text-muted mt-1"></p>
         <input type="hidden" id="input-id-pagamento" />
         <div class="flex gap-2 justify-end pt-1">
           <button type="button" id="botao-cancelar-pagamento" class="btn-text">Cancelar</button>
@@ -217,12 +225,13 @@ export async function montarContas(container, usuario) {
     </div>
   `;
 
-  const { abrirParaEdicao, abrirPagamento, pararCategorias } = await iniciarFormularios(usuario, ehGestor);
+  const { abrirParaEdicao, abrirPagamento, pararCategorias, pararLocais } = await iniciarFormularios(usuario, ehGestor);
   const pararEscuta = escutarContas(usuario, ehGestor, abrirParaEdicao, abrirPagamento);
 
   return () => {
     pararEscuta();
     pararCategorias();
+    pararLocais();
   };
 }
 
@@ -266,6 +275,7 @@ async function iniciarFormularios(usuario, ehGestor) {
   const inputDataPagamento = document.getElementById("input-data-pagamento");
   const selectMembroPagamento = document.getElementById("input-membro-pagamento");
   const inputValorPago = document.getElementById("input-valor-pago");
+  const selectLocalPagamento = document.getElementById("input-local-pagamento");
   const avisoValorPago = document.getElementById("aviso-valor-pago");
   const inputIdPagamento = document.getElementById("input-id-pagamento");
 
@@ -287,6 +297,13 @@ async function iniciarFormularios(usuario, ehGestor) {
 
   const pararCategorias = escutarCategorias("saida", (lista) => {
     categoriasConta = lista;
+  });
+
+  // 009.3 - Preenche o seletor de "de onde saiu" no pagamento (Painel Master → Categorias)
+  const pararLocais = escutarCategorias("local", (lista) => {
+    selectLocalPagamento.innerHTML =
+      lista.map((l) => `<option value="${l.nome}">${l.nome}</option>`).join("") ||
+      `<option value="">Nenhum cadastrado</option>`;
   });
 
   function renderizarSugestoesCategoria() {
@@ -481,6 +498,7 @@ async function iniciarFormularios(usuario, ehGestor) {
         valor: valorDoPagamento,
         membroId: selectMembroPagamento.value,
         membroNome: membro?.nome || "Membro",
+        local: selectLocalPagamento.value,
       },
     ];
 
@@ -495,7 +513,7 @@ async function iniciarFormularios(usuario, ehGestor) {
     fecharPagamento();
   });
 
-  return { abrirParaEdicao, abrirPagamento, pararCategorias };
+  return { abrirParaEdicao, abrirPagamento, pararCategorias, pararLocais };
 }
 
 // 015 - Remove um pagamento específico do histórico de uma conta e recalcula o valor pago
@@ -713,7 +731,7 @@ function cartaoConta(conta) {
             .map(
               (p, indice) => `
               <div class="flex items-center justify-between text-xs text-muted">
-                <span>${formatarData(p.data)} · ${p.membroNome} · ${formatarMoeda(p.valor)}</span>
+                <span>${formatarData(p.data)} · ${p.membroNome}${p.local ? ` · ${p.local}` : ""} · ${formatarMoeda(p.valor)}</span>
                 <button data-acao="remover-pagamento" data-id="${conta.id}" data-indice="${indice}" class="text-gray-400 dark:text-gray-500 hover:text-status-atrasado" aria-label="Remover pagamento">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />

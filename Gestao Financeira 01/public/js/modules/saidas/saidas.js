@@ -67,11 +67,19 @@ export async function montarSaidas(container, usuario) {
             <input id="input-data" type="date" required class="form-input" />
           </div>
         </div>
-        <div>
-          <label class="form-label">Categoria</label>
-          <select id="input-categoria" class="form-input">
-            <option value="">Carregando...</option>
-          </select>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="form-label">Categoria</label>
+            <select id="input-categoria" class="form-input">
+              <option value="">Carregando...</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">De onde saiu</label>
+            <select id="input-local" class="form-input">
+              <option value="">Carregando...</option>
+            </select>
+          </div>
         </div>
         <div id="grupo-membro" class="hidden">
           <label class="form-label">Membro</label>
@@ -92,12 +100,13 @@ export async function montarSaidas(container, usuario) {
     </div>
   `;
 
-  const { ehGestor, abrirParaEdicao, pararCategorias } = await iniciarFormulario(usuario);
+  const { ehGestor, abrirParaEdicao, pararCategorias, pararLocais } = await iniciarFormulario(usuario);
   const pararEscuta = escutarSaidas(usuario, ehGestor, abrirParaEdicao);
 
   return () => {
     pararEscuta();
     pararCategorias();
+    pararLocais();
   };
 }
 
@@ -127,6 +136,7 @@ async function iniciarFormulario(usuario) {
   const inputValor = document.getElementById("input-valor");
   const inputData = document.getElementById("input-data");
   const inputCategoria = document.getElementById("input-categoria");
+  const inputLocal = document.getElementById("input-local");
   const inputIdEdicao = document.getElementById("input-id-edicao");
 
   const ehGestor = usuario.nivel === "pro" || usuario.nivel === "master";
@@ -151,6 +161,15 @@ async function iniciarFormulario(usuario) {
       `<option value="">Nenhuma cadastrada</option>`;
   });
 
+  // 005.3 - Preenche o seletor de "de onde saiu o dinheiro" (Painel Master → Categorias)
+  let locais = [];
+  const pararLocais = escutarCategorias("local", (lista) => {
+    locais = lista;
+    inputLocal.innerHTML =
+      lista.map((l) => `<option value="${l.nome}">${l.nome}</option>`).join("") ||
+      `<option value="">Nenhum cadastrado</option>`;
+  });
+
   function abrirFormulario() {
     form.classList.remove("hidden");
     botaoNova.classList.add("hidden");
@@ -171,6 +190,7 @@ async function iniciarFormulario(usuario) {
     inputValor.value = numeroParaValorMoeda(saida.valor);
     inputData.value = saida.data;
     inputCategoria.value = saida.categoria || categorias[categorias.length - 1]?.nome || "";
+    inputLocal.value = saida.local || locais[0]?.nome || "";
     if (ehGestor) selectMembro.value = saida.membroId;
   }
 
@@ -186,6 +206,7 @@ async function iniciarFormulario(usuario) {
       valor: valorMoedaParaNumero(inputValor.value),
       data: inputData.value,
       categoria: inputCategoria.value,
+      local: inputLocal.value,
       membroId: ehGestor ? selectMembro.value : usuario.uid,
       membroNome: ehGestor
         ? membros.find((m) => m.uid === selectMembro.value)?.nome || "Membro"
@@ -203,7 +224,7 @@ async function iniciarFormulario(usuario) {
     fecharFormulario();
   });
 
-  return { ehGestor, abrirParaEdicao, pararCategorias };
+  return { ehGestor, abrirParaEdicao, pararCategorias, pararLocais };
 }
 
 // 008 - Escuta em tempo real as saídas da família (ou só as do próprio usuário, se "simples"),
@@ -273,7 +294,7 @@ function cartaoSaida(saida, ehGestor) {
       <div class="min-w-0">
         <p class="font-medium text-primary dark:text-white truncate">${saida.descricao}</p>
         <p class="text-xs text-muted">
-          ${formatarData(saida.data)} · ${saida.categoria || "Outros"}${ehGestor ? ` · ${saida.membroNome || "Membro"}` : ""}
+          ${formatarData(saida.data)} · ${saida.categoria || "Outros"}${saida.local ? ` · ${saida.local}` : ""}${ehGestor ? ` · ${saida.membroNome || "Membro"}` : ""}
         </p>
       </div>
       <div class="flex items-center gap-2 shrink-0">
