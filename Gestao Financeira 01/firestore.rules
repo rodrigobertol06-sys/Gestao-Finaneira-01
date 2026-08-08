@@ -1,0 +1,123 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 001 - Funções auxiliares de autorização, reaproveitadas em todas as regras abaixo
+    function estaLogado() {
+      return request.auth != null;
+    }
+
+    // 002 - Lê o cadastro (nível/família) de quem está fazendo a requisição
+    function meuUsuario() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+    }
+
+    function souMaster() {
+      return estaLogado() && meuUsuario().nivel == "master";
+    }
+
+    function meuNivel() {
+      return meuUsuario().nivel;
+    }
+
+    function minhaFamilia() {
+      return meuUsuario().familiaId;
+    }
+
+    // 003 - Cadastro de usuários: nível de acesso e vínculo com a família.
+    // Master tem acesso total. Pro só cria/edita/remove Simples e Pro dentro da própria família.
+    match /usuarios/{uid} {
+      allow read: if estaLogado() && (
+        request.auth.uid == uid ||
+        souMaster() ||
+        resource.data.familiaId == minhaFamilia()
+      );
+
+      allow create: if souMaster() || (
+        estaLogado() &&
+        meuNivel() == "pro" &&
+        request.resource.data.familiaId == minhaFamilia() &&
+        request.resource.data.nivel in ["simples", "pro"]
+      );
+
+      allow update: if souMaster() || (
+        estaLogado() &&
+        meuNivel() == "pro" &&
+        resource.data.familiaId == minhaFamilia() &&
+        request.resource.data.familiaId == minhaFamilia() &&
+        request.resource.data.nivel in ["simples", "pro"]
+      );
+
+      allow delete: if souMaster() || (
+        estaLogado() &&
+        meuNivel() == "pro" &&
+        resource.data.familiaId == minhaFamilia() &&
+        resource.data.nivel != "master"
+      );
+    }
+
+    // 004 - Categorias de Entradas/Saídas: globais (não pertencem a uma família).
+    // Qualquer usuário logado pode ler (para preencher os seletores); só o Master gerencia.
+    match /categorias/{categoriaId} {
+      allow read: if estaLogado();
+      allow create, update, delete: if souMaster();
+    }
+
+    // 004.1 - Cadastro de famílias: criação e ativação/desativação da licença são só do Master
+    match /familias/{familiaId} {
+      allow read: if souMaster() || (estaLogado() && minhaFamilia() == familiaId);
+      allow create, update: if souMaster();
+
+      // 005 - Entradas e Saídas: cada lançamento pertence a um membro (membroId).
+      // Simples só lê/cria/edita/apaga os próprios lançamentos; Pro e Master têm acesso a todos.
+      match /entradas/{docId} {
+        allow read: if souMaster() || (
+          estaLogado() && minhaFamilia() == familiaId &&
+          (meuNivel() != "simples" || resource.data.membroId == request.auth.uid)
+        );
+        allow create, update: if souMaster() || (
+          estaLogado() && minhaFamilia() == familiaId &&
+          (meuNivel() != "simples" || request.resource.data.membroId == request.auth.uid)
+        );
+        allow delete: if souMaster() || (
+          estaLogado() && minhaFamilia() == familiaId &&
+          (meuNivel() != "simples" || resource.data.membroId == request.auth.uid)
+        );
+      }
+
+      match /saidas/{docId} {
+        allow read: if souMaster() || (
+          estaLogado() && minhaFamilia() == familiaId &&
+          (meuNivel() != "simples" || resource.data.membroId == request.auth.uid)
+        );
+        allow create, update: if souMaster() || (
+          estaLogado() && minhaFamilia() == familiaId &&
+          (meuNivel() != "simples" || request.resource.data.membroId == request.auth.uid)
+        );
+        allow delete: if souMaster() || (
+          estaLogado() && minhaFamilia() == familiaId &&
+          (meuNivel() != "simples" || resource.data.membroId == request.auth.uid)
+        );
+      }
+
+      // 006 - Contas a Pagar: cada uma tem um responsável (responsavelId).
+      // Simples só lê/cria/edita/apaga as contas em que é o responsável (e só pode se atribuir
+      // a si mesmo); Pro e Master têm acesso total, inclusive atribuir a qualquer membro.
+      match /contas/{docId} {
+        allow read: if souMaster() || (
+          estaLogado() && minhaFamilia() == familiaId &&
+          (meuNivel() != "simples" || resource.data.responsavelId == request.auth.uid)
+        );
+        allow create: if souMaster() || (
+          estaLogado() && minhaFamilia() == familiaId &&
+          (meuNivel() != "simples" || request.resource.data.responsavelId == request.auth.uid)
+        );
+        allow update, delete: if souMaster() || (
+          estaLogado() && minhaFamilia() == familiaId &&
+          (meuNivel() != "simples" || resource.data.responsavelId == request.auth.uid)
+        );
+      }
+    }
+  }
+}

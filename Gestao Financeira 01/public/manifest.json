@@ -1,0 +1,18 @@
+{
+  "name": "Gestão Financeira Familiar",
+  "short_name": "Gestão Financeira",
+  "description": "Controle financeiro familiar: entradas, saídas e contas a pagar.",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#140B3D",
+  "theme_color": "#140B3D",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "assets/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

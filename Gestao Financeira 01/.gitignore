@@ -1,0 +1,13 @@
+# Dependências
+node_modules/
+
+# Executável standalone do Tailwind CSS (binário, baixado por ferramenta, não versionado)
+tailwindcss.exe
+
+# Logs e cache do Firebase CLI (o log antigo já teve um token exposto — nunca versionar)
+firebase-debug.log
+.firebase/
+
+# Sistema operacional
+.DS_Store
+Thumbs.db

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestão Financeira | Entrar</title>
+  <meta name="theme-color" content="#140B3D" />
+  <!-- 000 - Aplica o tema salvo ANTES do CSS carregar, evitando um flash da cor errada -->
+  <script>
+    if (localStorage.getItem("tema") === "dark") document.documentElement.classList.add("dark");
+  </script>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="css/output.css" />
+</head>
+<body class="min-h-screen flex items-center justify-center bg-primary px-4">
+
+  <!-- 001 - Cartão de login centralizado, mobile-first -->
+  <div class="w-full max-w-sm card p-6 sm:p-8">
+    <div class="text-center mb-6">
+      <h1 class="text-xl heading-primary">Gestão Financeira</h1>
+      <p class="text-sm text-muted mt-1">Acesse sua conta</p>
+    </div>
+
+    <form id="form-login" class="space-y-4">
+      <!-- 002 - Campo de usuário -->
+      <div>
+        <label for="input-usuario" class="form-label">Usuário</label>
+        <input
+          id="input-usuario"
+          type="text"
+          autocomplete="username"
+          required
+          class="form-input py-2.5 text-base"
+        />
+      </div>
+
+      <!-- 003 - Campo de senha -->
+      <div>
+        <label for="input-senha" class="form-label">Senha</label>
+        <input
+          id="input-senha"
+          type="password"
+          autocomplete="current-password"
+          required
+          class="form-input py-2.5 text-base"
+        />
+      </div>
+
+      <!-- 004 - Mensagem de erro, oculta por padrão -->
+      <p id="mensagem-erro" class="hidden text-sm text-status-atrasado"></p>
+
+      <!-- 005 - Botão de envio -->
+      <button
+        id="botao-entrar"
+        type="submit"
+        class="w-full bg-primary text-white font-semibold rounded-lg py-2.5 hover:bg-primary-light transition-colors"
+      >
+        Entrar
+      </button>
+    </form>
+  </div>
+
+  <script type="module" src="js/auth/login.js"></script>
+</body>
+</html>

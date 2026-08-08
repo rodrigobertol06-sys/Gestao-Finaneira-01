@@ -1,0 +1,9 @@
+{
+  "name": "gestao-financeira",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "./tailwindcss.exe -i ./public/css/input.css -o ./public/css/output.css --watch",
+    "build": "./tailwindcss.exe -i ./public/css/input.css -o ./public/css/output.css --minify"
+  }
+}
