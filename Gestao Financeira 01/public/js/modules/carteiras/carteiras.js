@@ -21,8 +21,8 @@ import {
 } from "../../core/utils.js";
 import { escutarCategorias } from "../categorias/categorias.js";
 
-// 002 - Monta a tela de Carteiras: saldo por carteira ("onde está o dinheiro"), transferência entre
-// carteiras e saque (transferência com destino em dinheiro). Toda transferência/saque gera UM
+// 002 - Monta a tela de Carteiras: saldo por carteira ("onde está o dinheiro") e transferência entre
+// carteiras (um saque é só uma transferência com destino em "Dinheiro"). Toda transferência gera UM
 // lançamento de Saída (na origem) e UM de Entrada (no destino), ligados por um "transferenciaId" —
 // assim eles entram nos totais normais de Entradas/Saídas e no saldo geral, sem lançamento duplicado manual.
 export async function montarCarteiras(container, usuario) {
@@ -51,21 +51,18 @@ export async function montarCarteiras(container, usuario) {
         <p class="text-sm text-muted col-span-full text-center py-4">Carregando...</p>
       </div>
 
-      <div class="flex gap-2">
-        <button id="botao-transferir" class="btn-primary flex-1">Transferir</button>
-        <button id="botao-sacar" class="btn-text flex-1">Sacar</button>
-      </div>
+      <button id="botao-transferir" class="btn-primary w-full">Transferir entre carteiras</button>
 
       <form id="form-transferencia" class="hidden card p-4 space-y-3">
-        <p id="titulo-form-transferencia" class="form-label">Transferência entre carteiras</p>
+        <p class="form-label">Transferência entre carteiras</p>
         <div class="grid grid-cols-2 gap-3">
-          <div id="grupo-origem">
+          <div>
             <label class="form-label">De</label>
             <select id="input-origem" class="form-input">
               <option value="">Carregando...</option>
             </select>
           </div>
-          <div id="grupo-destino">
+          <div>
             <label class="form-label">Para</label>
             <select id="input-destino" class="form-input">
               <option value="">Carregando...</option>
@@ -97,7 +94,7 @@ export async function montarCarteiras(container, usuario) {
       </form>
 
       <div>
-        <h2 class="text-sm font-semibold text-primary dark:text-white mb-2">Histórico de transferências e saques</h2>
+        <h2 class="text-sm font-semibold text-primary dark:text-white mb-2">Histórico de transferências</h2>
         <div id="lista-transferencias" class="space-y-2">
           <p class="text-sm text-muted text-center py-4">Carregando...</p>
         </div>
@@ -126,11 +123,7 @@ async function buscarMembros(usuario) {
 function iniciarCarteiras(usuario, ehGestor) {
   const listaSaldos = document.getElementById("lista-saldos");
   const botaoTransferir = document.getElementById("botao-transferir");
-  const botaoSacar = document.getElementById("botao-sacar");
   const formTransferencia = document.getElementById("form-transferencia");
-  const tituloForm = document.getElementById("titulo-form-transferencia");
-  const grupoOrigem = document.getElementById("grupo-origem");
-  const grupoDestino = document.getElementById("grupo-destino");
   const selectOrigem = document.getElementById("input-origem");
   const selectDestino = document.getElementById("input-destino");
   const inputValor = document.getElementById("input-valor-transferencia");
@@ -144,7 +137,6 @@ function iniciarCarteiras(usuario, ehGestor) {
 
   let locais = [];
   let membros = [];
-  let modoSaque = false;
   let entradas = [];
   let saidas = [];
   let contas = [];
@@ -163,39 +155,29 @@ function iniciarCarteiras(usuario, ehGestor) {
     if (selectMembro) selectMembro.innerHTML = membros.map((m) => `<option value="${m.uid}">${m.nome}</option>`).join("");
   });
 
-  // 006 - Abre o formulário em modo "Transferir" (origem e destino livres) ou "Sacar"
-  // (destino fixo na carteira "Dinheiro", campo ocultado)
-  function abrirFormulario(saque) {
-    modoSaque = saque;
-    tituloForm.textContent = saque ? "Sacar (transferir para Dinheiro)" : "Transferência entre carteiras";
-    grupoDestino.classList.toggle("hidden", saque);
-    grupoOrigem.classList.toggle("col-span-2", saque);
+  // 006 - Abre/fecha o formulário de transferência (um saque é só uma transferência com destino "Dinheiro")
+  function abrirFormulario() {
     inputData.value = new Date().toISOString().slice(0, 10);
     formTransferencia.classList.remove("hidden");
     botaoTransferir.classList.add("hidden");
-    botaoSacar.classList.add("hidden");
   }
 
   function fecharFormulario() {
     formTransferencia.reset();
     formTransferencia.classList.add("hidden");
     botaoTransferir.classList.remove("hidden");
-    botaoSacar.classList.remove("hidden");
   }
 
-  botaoTransferir.addEventListener("click", () => abrirFormulario(false));
-  botaoSacar.addEventListener("click", () => abrirFormulario(true));
+  botaoTransferir.addEventListener("click", abrirFormulario);
   botaoCancelar.addEventListener("click", fecharFormulario);
 
-  // 007 - Confirma a transferência/saque: grava uma Saída na origem e uma Entrada no destino,
+  // 007 - Confirma a transferência: grava uma Saída na origem e uma Entrada no destino,
   // ambas com o mesmo "transferenciaId" (para poder excluir as duas de uma vez depois)
   formTransferencia.addEventListener("submit", async (evento) => {
     evento.preventDefault();
 
     const origem = selectOrigem.value;
-    const destino = modoSaque
-      ? locais.find((l) => l.nome.toLowerCase() === "dinheiro")?.nome || locais[0]?.nome || "Dinheiro"
-      : selectDestino.value;
+    const destino = selectDestino.value;
 
     if (!origem || !destino || origem === destino) {
       alert("Escolha carteiras de origem e destino diferentes.");
@@ -207,7 +189,7 @@ function iniciarCarteiras(usuario, ehGestor) {
     const membroId = ehGestor ? selectMembro.value : usuario.uid;
     const membroNome = membros.find((m) => m.uid === membroId)?.nome || usuario.nomeExibicao || "Você";
     const transferenciaId = doc(collection(db, "familias", usuario.familiaId, "saidas")).id;
-    const descricao = modoSaque ? `Saque: ${origem} → ${destino}` : `Transferência: ${origem} → ${destino}`;
+    const descricao = `Transferência: ${origem} → ${destino}`;
 
     await addDoc(collection(db, "familias", usuario.familiaId, "saidas"), {
       descricao,

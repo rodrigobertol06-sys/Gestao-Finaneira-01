@@ -107,6 +107,20 @@ export function htmlNavegadorMes() {
   `;
 }
 
+// 013 - Soma "meses" a uma data "AAAA-MM-DD" e devolve outra data no mesmo formato.
+// Usado para gerar o vencimento/data de cada parcela de um lançamento parcelado ou recorrente.
+export function somarMeses(dataString, meses) {
+  const [ano, mes, dia] = dataString.split("-").map(Number);
+  const data = new Date(ano, mes - 1 + meses, dia);
+  return `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}-${String(data.getDate()).padStart(2, "0")}`;
+}
+
+// 014 - Gera um identificador único para agrupar as parcelas de um mesmo financiamento/recorrência
+export function gerarIdGrupo() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  return `grupo-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+}
+
 // 012 - Liga os botões do navegador de mês gerado por htmlNavegadorMes().
 // Recebe o mês inicial e um callback chamado com o novo mês a cada troca. Retorna o mês atual (mutável via closure).
 export function iniciarNavegadorMes(mesInicial, aoMudar) {

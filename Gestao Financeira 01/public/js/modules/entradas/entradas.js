@@ -22,6 +22,8 @@ import {
   habilitarAtalhoCalendario,
   htmlNavegadorMes,
   iniciarNavegadorMes,
+  somarMeses,
+  gerarIdGrupo,
 } from "../../core/utils.js";
 import { escutarCategorias } from "../categorias/categorias.js";
 
@@ -87,6 +89,18 @@ export async function montarEntradas(container, usuario) {
           <label class="form-label">Membro</label>
           <select id="input-membro" class="form-input"></select>
         </div>
+
+        <div id="grupo-recorrente-toggle" class="flex items-center gap-2 pt-1">
+          <input id="input-recorrente" type="checkbox" class="h-4 w-4" />
+          <label for="input-recorrente" class="text-sm text-gray-700 dark:text-gray-300">Isso vai se repetir por várias vezes (ex: venda parcelada)?</label>
+        </div>
+
+        <div id="grupo-repeticoes" class="hidden space-y-1 pt-1 border-t border-gray-200 dark:border-white/10">
+          <label class="form-label">Quantidade de vezes</label>
+          <input id="input-quantidade-repeticoes" type="number" min="2" step="1" class="form-input" />
+          <p class="text-xs text-muted">Lança o mesmo valor todo mês, começando na data informada acima.</p>
+        </div>
+
         <input type="hidden" id="input-id-edicao" />
         <div class="flex gap-2 justify-end pt-1">
           <button type="button" id="botao-cancelar-entrada" class="btn-text">Cancelar</button>
@@ -139,6 +153,10 @@ async function iniciarFormulario(usuario) {
   const inputData = document.getElementById("input-data");
   const inputCategoria = document.getElementById("input-categoria");
   const inputLocal = document.getElementById("input-local");
+  const grupoRecorrenteToggle = document.getElementById("grupo-recorrente-toggle");
+  const inputRecorrente = document.getElementById("input-recorrente");
+  const grupoRepeticoes = document.getElementById("grupo-repeticoes");
+  const inputQuantidadeRepeticoes = document.getElementById("input-quantidade-repeticoes");
   const inputIdEdicao = document.getElementById("input-id-edicao");
 
   const ehGestor = usuario.nivel === "pro" || usuario.nivel === "master";
@@ -180,12 +198,21 @@ async function iniciarFormulario(usuario) {
   function fecharFormulario() {
     form.reset();
     inputIdEdicao.value = "";
+    grupoRepeticoes.classList.add("hidden");
     form.classList.add("hidden");
     botaoNova.classList.remove("hidden");
   }
 
+  // 006.4 - "Nova entrada" permite marcar repetição; edição é sempre de um lançamento individual
+  function abrirParaCriacao() {
+    fecharFormulario();
+    grupoRecorrenteToggle.classList.remove("hidden");
+    abrirFormulario();
+  }
+
   // 007 - Preenche o formulário com os dados de uma entrada existente para edição
   function abrirParaEdicao(entrada) {
+    grupoRecorrenteToggle.classList.add("hidden");
     abrirFormulario();
     inputIdEdicao.value = entrada.id;
     inputDescricao.value = entrada.descricao;
@@ -196,31 +223,78 @@ async function iniciarFormulario(usuario) {
     if (ehGestor) selectMembro.value = entrada.membroId;
   }
 
-  botaoNova.addEventListener("click", abrirFormulario);
+  inputRecorrente.addEventListener("change", () => {
+    grupoRepeticoes.classList.toggle("hidden", !inputRecorrente.checked);
+  });
+
+  botaoNova.addEventListener("click", abrirParaCriacao);
   botaoCancelar.addEventListener("click", fecharFormulario);
 
-  // 008 - Trata o envio do formulário: cria uma nova entrada ou atualiza uma existente
+  // 008 - Trata o envio do formulário: cria uma nova entrada (ou várias repetições de uma vez) ou atualiza uma existente
   form.addEventListener("submit", async (evento) => {
     evento.preventDefault();
 
-    const dados = {
-      descricao: inputDescricao.value.trim(),
-      valor: valorMoedaParaNumero(inputValor.value),
-      data: inputData.value,
-      categoria: inputCategoria.value,
-      local: inputLocal.value,
-      membroId: ehGestor ? selectMembro.value : usuario.uid,
-      membroNome: ehGestor
-        ? membros.find((m) => m.uid === selectMembro.value)?.nome || "Membro"
-        : usuario.nomeExibicao || "Você",
-    };
+    const descricao = inputDescricao.value.trim();
+    const valor = valorMoedaParaNumero(inputValor.value);
+    const data = inputData.value;
+    const categoria = inputCategoria.value;
+    const local = inputLocal.value;
+    const membroId = ehGestor ? selectMembro.value : usuario.uid;
+    const membroNome = ehGestor
+      ? membros.find((m) => m.uid === selectMembro.value)?.nome || "Membro"
+      : usuario.nomeExibicao || "Você";
 
     const referenciaColecao = collection(db, "familias", usuario.familiaId, "entradas");
 
     if (inputIdEdicao.value) {
-      await updateDoc(doc(referenciaColecao, inputIdEdicao.value), dados);
+      await updateDoc(doc(referenciaColecao, inputIdEdicao.value), {
+        descricao,
+        valor,
+        data,
+        categoria,
+        local,
+        membroId,
+        membroNome,
+      });
+      fecharFormulario();
+      return;
+    }
+
+    if (inputRecorrente.checked) {
+      // 008.1 - Repetição (ex: venda parcelada): lança o mesmo valor uma vez por mês, a partir da data informada
+      const totalRepeticoes = Math.max(Number(inputQuantidadeRepeticoes.value) || 1, 2);
+      const grupoRecorrencia = gerarIdGrupo();
+
+      const tarefas = [];
+      for (let i = 0; i < totalRepeticoes; i += 1) {
+        tarefas.push(
+          addDoc(referenciaColecao, {
+            descricao: `${descricao} (${i + 1}/${totalRepeticoes})`,
+            valor,
+            data: somarMeses(data, i),
+            categoria,
+            local,
+            membroId,
+            membroNome,
+            grupoRecorrencia,
+            numeroParcela: i + 1,
+            totalParcelas: totalRepeticoes,
+            criadoEm: serverTimestamp(),
+          })
+        );
+      }
+      await Promise.all(tarefas);
     } else {
-      await addDoc(referenciaColecao, { ...dados, criadoEm: serverTimestamp() });
+      await addDoc(referenciaColecao, {
+        descricao,
+        valor,
+        data,
+        categoria,
+        local,
+        membroId,
+        membroNome,
+        criadoEm: serverTimestamp(),
+      });
     }
 
     fecharFormulario();

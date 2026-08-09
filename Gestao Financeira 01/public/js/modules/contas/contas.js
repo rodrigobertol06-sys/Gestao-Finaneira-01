@@ -21,6 +21,8 @@ import {
   numeroParaValorMoeda,
   habilitarAtalhoCalendario,
   formatarRotuloMes,
+  somarMeses,
+  gerarIdGrupo,
 } from "../../core/utils.js";
 import { escutarCategorias } from "../categorias/categorias.js";
 
@@ -54,20 +56,6 @@ function vencimentoJaPassou(conta) {
   hoje.setHours(0, 0, 0, 0);
   const [ano, mes, dia] = conta.vencimento.split("-").map(Number);
   return new Date(ano, mes - 1, dia) < hoje;
-}
-
-// 004 - Soma "meses" a uma data "AAAA-MM-DD" e devolve outra data no mesmo formato.
-// Usado para gerar o vencimento de cada parcela de uma conta parcelada.
-function somarMeses(dataString, meses) {
-  const [ano, mes, dia] = dataString.split("-").map(Number);
-  const data = new Date(ano, mes - 1 + meses, dia);
-  return `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}-${String(data.getDate()).padStart(2, "0")}`;
-}
-
-// 005 - Gera um identificador único para agrupar as parcelas de um mesmo financiamento/empréstimo
-function gerarIdGrupo() {
-  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
-  return `grupo-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
 }
 
 // 007 - Monta a tela de Contas a Pagar dentro do container informado.
